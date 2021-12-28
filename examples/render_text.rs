@@ -8,8 +8,8 @@ const NOTO_SANS_JP: &[u8] = include_bytes!("../assets/fonts/NotoSansJP-Regular.o
 fn window_conf() -> Conf {
   Conf {
     window_title: "Rendering Text Example".to_owned(),
-    window_width: 1280,
-    window_height: 720,
+    window_width: 330,
+    window_height: 267,
     high_dpi: true,
     window_resizable: true,
     ..Default::default()
@@ -24,9 +24,9 @@ async fn main() {
   fonts.load_font_from_bytes(NOTO_SANS_JP).unwrap();
 
   loop {
-    fonts.draw_text("Nice", 20.0, 20.0, 69.0, Color::from([1.0; 4])); // Nice
-    fonts.draw_text("良い", 20.0, 50.0, 69.0, Color::from([1.0; 4])); // Nice
-    fonts.draw_text("Nice 良い", 20.0, 80.0, 69.0, Color::from([1.0; 4])); // Nice
+    fonts.draw_text("Nice", 20.0, 0.0, 69, Color::from([1.0; 4]));
+    fonts.draw_text("良い", 20.0, 89.0, 69, Color::from([1.0; 4]));
+    fonts.draw_text("Nice 良い", 20.0, 178.0, 69, Color::from([1.0; 4]));
 
     next_frame().await;
   }
