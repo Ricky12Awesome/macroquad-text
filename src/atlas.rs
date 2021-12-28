@@ -4,10 +4,7 @@
 
 use std::collections::HashMap;
 
-use macroquad::color::Color;
-use macroquad::math::Rect;
-use macroquad::texture::{Image, Texture2D};
-use macroquad::miniquad::FilterMode;
+use macroquad::prelude::{Color, FilterMode, Image, Rect, Texture2D};
 
 #[derive(Debug, Clone, Copy)]
 pub struct Sprite {

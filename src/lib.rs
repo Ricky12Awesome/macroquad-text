@@ -5,11 +5,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 
 use fontdue::{Font, FontResult, FontSettings, Metrics};
-use macroquad::color::Color;
-use macroquad::math::vec2;
-use macroquad::miniquad::FilterMode;
-use macroquad::prelude::{draw_texture_ex, Image};
-use macroquad::texture::DrawTextureParams;
+use macroquad::prelude::{Color, draw_texture_ex, DrawTextureParams, FilterMode, Image, TextDimensions, vec2};
 
 use crate::atlas::Atlas;
 
@@ -131,6 +127,36 @@ impl Fonts {
       .unwrap_or_default()
   }
 
+  pub fn measure_text(&self, text: &str, size: u16) -> TextDimensions {
+    let mut width = 0f32;
+    let mut min_y = f32::MAX;
+    let mut max_y = f32::MIN;
+
+    for c in text.chars() {
+      self.cache_glyph(c, size);
+      let info = self.chars.borrow()[&(c, size)];
+      let glyph = self.atlas.borrow().get(info.id).unwrap().rect;
+
+      width += info.advance;
+
+      if min_y > info.offset_y {
+        min_y = info.offset_y;
+      }
+
+      if max_y < glyph.h + info.offset_y {
+        max_y = glyph.h + info.offset_y;
+      }
+    }
+
+    TextDimensions {
+      width,
+      height: max_y - min_y,
+      offset_y: max_y,
+    }
+  }
+
+  /// Draws text tp to the screen,
+  /// draws from TopLeft
   pub fn draw_text(&self, text: &str, x: f32, y: f32, size: u16, color: Color) {
     self.draw_text_ex(text, &TextParams {
       x,
