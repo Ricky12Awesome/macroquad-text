@@ -33,7 +33,7 @@ impl Atlas {
   const UNIQUENESS_OFFSET: u64 = 100000;
 
   pub fn new(filter: FilterMode) -> Atlas {
-    let image = Image::gen_image_color(512, 512, Color::new(0.0, 0.0, 0.0, 0.0));
+    let image = Image::gen_image_color(4096, 4096, Color::new(0.0, 0.0, 0.0, 0.0));
     let texture = Texture2D::from_rgba8(image.width, image.height, &image.bytes);
 
     Atlas {
@@ -168,6 +168,6 @@ impl Atlas {
 
 impl Default for Atlas {
   fn default() -> Self {
-    Atlas::new(FilterMode::Nearest)
+    Atlas::new(FilterMode::Linear)
   }
 }

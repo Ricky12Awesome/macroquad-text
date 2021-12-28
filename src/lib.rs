@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use fontdue::{Font, FontResult, FontSettings, Metrics};
 use macroquad::color::Color;
 use macroquad::math::vec2;
+use macroquad::miniquad::FilterMode;
 use macroquad::prelude::{draw_texture_ex, Image};
 use macroquad::texture::DrawTextureParams;
 
@@ -14,12 +15,33 @@ use crate::atlas::Atlas;
 
 pub mod atlas;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
+pub enum DrawFrom {
+  BottomLeft,
+  TopLeft,
+}
+
+impl Default for DrawFrom {
+  fn default() -> Self {
+    Self::TopLeft
+  }
+}
+
+#[derive(Default, Debug, Copy, Clone, PartialEq, PartialOrd)]
 pub struct CharacterInfo {
   pub id: u64,
   pub offset_x: f32,
   pub offset_y: f32,
   pub advance: f32,
+}
+
+#[derive(Default, Debug, Copy, Clone, PartialEq)]
+pub struct TextParams {
+  pub x: f32,
+  pub y: f32,
+  pub size: u16,
+  pub color: Color,
+  pub draw: DrawFrom,
 }
 
 #[derive(Default)]
@@ -30,6 +52,13 @@ pub struct Fonts {
 }
 
 impl Fonts {
+  pub fn new(filter: FilterMode) -> Self {
+    Self {
+      atlas: RefCell::new(Atlas::new(filter)),
+      ..Self::default()
+    }
+  }
+
   pub fn fonts(&self) -> &Vec<Font> {
     &self.fonts
   }
@@ -74,18 +103,28 @@ impl Fonts {
 
   /// Loads font from bytes with a scale of 100.0
   pub fn load_font_from_bytes(&mut self, bytes: &[u8]) -> FontResult<()> {
-    self.load_font_from_bytes_with_scale(bytes, 100.0)
+    self.load_font_from_bytes_with_scale(bytes, 10000.0)
+  }
+
+  /// Checks if any fonts supports this character
+  pub fn contains(&self, c: char) -> bool {
+    self.lookup_glyph_index(c).1 != 0
+  }
+
+  // Looks up glyph index in all fonts until it finds one
+  pub fn lookup_glyph_index(&self, c: char) -> (usize, u16) {
+    self.fonts.iter()
+      .map(|font| font.lookup_glyph_index(c))
+      .enumerate()
+      .find(|(_, glyph_idx)| *glyph_idx != 0)
+      .unwrap_or_default()
   }
 
   /// Will rasterize a character using which ever font that contains that character first
   ///
   /// **See** [Font::rasterize] or [Font::rasterize_indexed]
   pub fn rasterize(&self, c: char, px: f32) -> (Metrics, Vec<u8>) {
-    let (font_idx, glyph_idx) = self.fonts.iter()
-      .map(|font| font.lookup_glyph_index(c))
-      .enumerate()
-      .find(|(_, glyph_idx)| *glyph_idx != 0)
-      .unwrap_or_default();
+    let (font_idx, glyph_idx) = self.lookup_glyph_index(c);
 
     self.fonts.get(font_idx)
       .map(|it| it.rasterize_indexed(glyph_idx, px))
@@ -93,19 +132,34 @@ impl Fonts {
   }
 
   pub fn draw_text(&self, text: &str, x: f32, y: f32, size: u16, color: Color) {
+    self.draw_text_ex(text, &TextParams {
+      x,
+      y,
+      size,
+      color,
+      draw: Default::default(),
+    })
+  }
+
+  pub fn draw_text_ex(&self, text: &str, params: &TextParams) {
     let mut total_width = 0f32;
 
     for c in text.chars() {
-      self.cache_glyph(c, size);
+      self.cache_glyph(c, params.size);
       let mut atlas = self.atlas.borrow_mut();
-      let info = &self.chars.borrow()[&(c, size)];
+      let info = &self.chars.borrow()[&(c, params.size)];
       let glyph = atlas.get(info.id).unwrap().rect;
+      let mut y = 0.0 - glyph.h - info.offset_y + params.y;
+
+      if let DrawFrom::TopLeft = params.draw {
+        y += params.size as f32;
+      }
 
       draw_texture_ex(
         atlas.texture(),
-        info.offset_x + total_width + x,
-        0.0 - glyph.h - info.offset_y + y * 4f32,
-        color,
+        info.offset_x + total_width + params.x,
+        y,
+        params.color,
         DrawTextureParams {
           dest_size: Some(vec2(glyph.w, glyph.h)),
           source: Some(glyph),

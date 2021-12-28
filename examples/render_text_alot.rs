@@ -7,9 +7,9 @@ const NOTO_SANS_JP: &[u8] = include_bytes!("../assets/fonts/NotoSansJP-Regular.o
 
 fn window_conf() -> Conf {
   Conf {
-    window_title: "Rendering Text Example".to_owned(),
-    window_width: 330,
-    window_height: 267,
+    window_title: "Rendering Text A lot Example".to_owned(),
+    window_width: 2000,
+    window_height: 1200,
     high_dpi: true,
     window_resizable: true,
     ..Default::default()
@@ -27,10 +27,20 @@ async fn main() {
     println!("{} {}", font.file_hash(), font.glyph_count());
   }
 
+  // This might take a while to cache all of these chars
+
+  let chars = (0..24000u32)
+    .filter_map(char::from_u32)
+    .filter(|c| fonts.contains(*c))
+    .collect::<Vec<char>>()
+    .chunks(120)
+    .map(|it| it.iter().collect::<String>())
+    .collect::<Vec<_>>();
+
   loop {
-    fonts.draw_text("Nice", 20.0, 0.0, 69, Color::from([1.0; 4])); // Nice
-    fonts.draw_text("良い", 20.0, 89.0, 69, Color::from([1.0; 4])); // Nice
-    fonts.draw_text("Nice 良い", 20.0, 178.0, 69, Color::from([1.0; 4])); // Nice
+    for (i, line) in chars.iter().enumerate() {
+      fonts.draw_text(line, 0.0, 24.0 * i as f32, 18, Color::from([1.0; 4]));
+    }
 
     next_frame().await;
   }
