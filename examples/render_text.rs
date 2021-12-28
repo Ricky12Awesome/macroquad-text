@@ -23,14 +23,10 @@ async fn main() {
   fonts.load_font_from_bytes(NOTO_SANS).unwrap();
   fonts.load_font_from_bytes(NOTO_SANS_JP).unwrap();
 
-  for font in fonts.fonts() {
-    println!("{} {}", font.file_hash(), font.glyph_count());
-  }
-
   loop {
-    fonts.draw_text("Nice", 20.0, 0.0, 69, Color::from([1.0; 4])); // Nice
-    fonts.draw_text("良い", 20.0, 89.0, 69, Color::from([1.0; 4])); // Nice
-    fonts.draw_text("Nice 良い", 20.0, 178.0, 69, Color::from([1.0; 4])); // Nice
+    fonts.draw_text("Nice", 20.0, 0.0, 69, Color::from([1.0; 4]));
+    fonts.draw_text("良い", 20.0, 89.0, 69, Color::from([1.0; 4]));
+    fonts.draw_text("Nice 良い", 20.0, 178.0, 69, Color::from([1.0; 4]));
 
     next_frame().await;
   }
