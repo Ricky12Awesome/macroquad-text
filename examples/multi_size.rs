@@ -2,9 +2,11 @@ use macroquad::prelude::*;
 
 use macroquad_font_renderer::{DrawFrom, Fonts, TextParams};
 
+// Include Fonts
 const NOTO_SANS: &[u8] = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");
 const NOTO_SANS_JP: &[u8] = include_bytes!("../assets/fonts/NotoSansJP-Regular.otf");
 
+// Window config for macroquad
 fn window_conf() -> Conf {
   Conf {
     window_title: "Multi Size Example".to_owned(),
@@ -18,21 +20,21 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+  // Start by creating a fonts instance to handle all your fonts
   let mut fonts = Fonts::default();
 
+  // Load fonts, the order you load fonts is the order it uses for lookups
   fonts.load_font_from_bytes(NOTO_SANS).unwrap();
   fonts.load_font_from_bytes(NOTO_SANS_JP).unwrap();
-
-  for font in fonts.fonts() {
-    println!("{} {}", font.file_hash(), font.glyph_count());
-  }
 
   loop {
     let mut prev = 0.0;
     let mut i = 10;
 
     while i <= screen_width() as u16 * 2 {
-      fonts.draw_text_ex("a", &TextParams {
+      // Draw text
+      fonts.draw_text_ex(&TextParams {
+        text: "a",
         x: prev,
         y: screen_height(),
         size: i,
@@ -47,8 +49,3 @@ async fn main() {
     next_frame().await;
   }
 }
-
-
-
-
-

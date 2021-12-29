@@ -2,6 +2,14 @@
 name = "macroquad_font_renderer"
 version = "0.1.0"
 edition = "2021"
+description = "A Simple way to draw text in macroquad with support of using glyphs from multiple fonts in a single draw_text call, also known as fallback fonts"
+authors = ["Ricky12Awesome"]
+readme = "README.md"
+license = "MIT"
+categories = ["macroquad", "graphics", "text", "font", "ttf", "truetype", "opentype"]
+homepage = "https://github.com/Ricky12Awesome/macroquad_font_renderer"
+repository = "https://github.com/Ricky12Awesome/macroquad_font_renderer"
+exclude = ["assets"]
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 

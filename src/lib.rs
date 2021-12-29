@@ -1,5 +1,41 @@
-//! Heavily inspired from macroquad font system
-//! just with a lot of fluff removed and fallback font support
+//! A lot of stuff was based on macroquads font system,
+//! just removed dpi_scaling and font_scaling and added
+//! fallback font support
+//!
+//! **Example**
+//!
+//! From [examples/render_text.rs](https://github.com/Ricky12Awesome/macroquad_font_renderer/blob/main/examples/render_text.rs)
+//!
+//! ```rs
+//! // Include Fonts
+//! const NOTO_SANS: &[u8] = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");
+//! const NOTO_SANS_JP: &[u8] = include_bytes!("../assets/fonts/NotoSansJP-Regular.otf");
+//!
+//! // Window Config for macroquad
+//! fn window_conf() -> Conf { ... }
+//!
+//! #[macroquad::main(window_conf)]
+//! async fn main() {
+//!   // Start by creating a fonts instance to handle all your fonts
+//!   let mut fonts = Fonts::default();
+//!
+//!   // Load fonts, the order you load fonts is the order it uses for lookups
+//!   fonts.load_font_from_bytes(NOTO_SANS).unwrap();
+//!   fonts.load_font_from_bytes(NOTO_SANS_JP).unwrap();
+//!
+//!   loop {
+//!     // Draw text
+//!     fonts.draw_text("Nice", 20.0, 0.0, 69, Color::from([1.0; 4]));
+//!     fonts.draw_text("良い", 20.0, 89.0, 69, Color::from([1.0; 4]));
+//!     fonts.draw_text("Nice 良い", 20.0, 178.0, 69, Color::from([1.0; 4]));
+//!
+//!     next_frame().await;
+//!   }
+//! }
+//! ```
+//!
+//! ![img.png](https://raw.githubusercontent.com/Ricky12Awesome/macroquad_font_renderer/main/examples/render_text_window.png)
+//!
 
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -9,7 +45,9 @@ use macroquad::prelude::{Color, draw_texture_ex, DrawTextureParams, FilterMode, 
 
 use crate::atlas::Atlas;
 
-pub mod atlas;
+pub(crate) mod atlas;
+
+pub type ScalingMode = FilterMode;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DrawFrom {
@@ -31,8 +69,9 @@ pub struct CharacterInfo {
   pub advance: f32,
 }
 
-#[derive(Default, Debug, Copy, Clone, PartialEq)]
-pub struct TextParams {
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct TextParams<'a> {
+  pub text: &'a str,
   pub x: f32,
   pub y: f32,
   pub size: u16,
@@ -40,25 +79,66 @@ pub struct TextParams {
   pub draw: DrawFrom,
 }
 
-#[derive(Default)]
+impl<'a> Default for TextParams<'a> {
+  fn default() -> Self {
+    Self {
+      text: "",
+      x: 0.0,
+      y: 0.0,
+      size: 22,
+      color: Color::from_rgba(255, 255, 255, 255),
+      draw: DrawFrom::TopLeft,
+    }
+  }
+}
+
 pub struct Fonts {
   fonts: Vec<Font>,
   atlas: RefCell<Atlas>,
   chars: RefCell<HashMap<(char, u16), CharacterInfo>>,
 }
 
+impl Default for Fonts {
+  /// Creates a new [Fonts] instance to handle all your font
+  ///
+  /// Same as calling [Fonts::new(ScalingMode::Linear)]
+  fn default() -> Self {
+    Self::new(ScalingMode::Linear)
+  }
+}
+
 impl Fonts {
-  pub fn new(filter: FilterMode) -> Self {
+  /// Creates a new [Fonts] instance to handle all your fonts with a given [ScalingMode]
+  ///
+  /// You can also call [Fonts::default] which defaults to [ScalingMode::Linear]
+  ///
+  /// **Examples**
+  ///
+  /// With nearest mode
+  /// ```rs
+  /// let mut fonts = Fonts::new(ScalingMode::Nearest);
+  /// ```
+  /// With linear mode
+  /// ```rs
+  /// let mut fonts = Fonts::new(ScalingMode::Linear);
+  /// ```
+  pub fn new(mode: ScalingMode) -> Self {
     Self {
-      atlas: RefCell::new(Atlas::new(filter)),
-      ..Self::default()
+      fonts: Vec::default(),
+      atlas: RefCell::new(Atlas::new(mode)),
+      chars: RefCell::default(),
     }
   }
 
+  /// Returns an immutable reference to the
+  /// list of fonts that are currently loaded
   pub fn fonts(&self) -> &Vec<Font> {
     &self.fonts
   }
 
+  /// Caches a glyph for a given character with a given font size
+  ///
+  /// You don't really need to call this function since caching happens automatically
   pub fn cache_glyph(&self, c: char, size: u16) {
     if self.chars.borrow().contains_key(&(c, size)) {
       return;
@@ -88,6 +168,18 @@ impl Fonts {
     cache.insert((c, size), info);
   }
 
+  /// Loads font from bytes with a given scale
+  ///
+  ///
+  /// What Scale does
+  /// ---------------
+  /// (copied from [FontSettings::scale](FontSettings))
+  ///
+  /// The scale in px the font geometry is optimized for. Fonts rendered at
+  /// the scale defined here will be the most optimal in terms of looks and performance. Glyphs
+  /// rendered smaller than this scale will look the same but perform slightly worse, while
+  /// glyphs rendered larger than this will looks worse but perform slightly better. The units of
+  /// the scale are pixels per Em unit.
   pub fn load_font_from_bytes_with_scale(&mut self, bytes: &[u8], scale: f32) -> FontResult<()> {
     let settings = FontSettings { collection_index: 0, scale };
     let font = Font::from_bytes(bytes, settings)?;
@@ -99,7 +191,7 @@ impl Fonts {
 
   /// Loads font from bytes with a scale of 100.0
   pub fn load_font_from_bytes(&mut self, bytes: &[u8]) -> FontResult<()> {
-    self.load_font_from_bytes_with_scale(bytes, 10000.0)
+    self.load_font_from_bytes_with_scale(bytes, 100.0)
   }
 
   /// Checks if any fonts supports this character
@@ -107,7 +199,7 @@ impl Fonts {
     self.lookup_glyph_index(c).1 != 0
   }
 
-  // Looks up glyph index in all fonts until it finds one
+  /// Looks up glyph index in all fonts until it finds one
   pub fn lookup_glyph_index(&self, c: char) -> (usize, u16) {
     self.fonts.iter()
       .map(|font| font.lookup_glyph_index(c))
@@ -116,7 +208,7 @@ impl Fonts {
       .unwrap_or_default()
   }
 
-  /// Will rasterize a character using which ever font that contains that character first
+  /// Rasterize a character using which ever font that contains that character first
   ///
   /// **See** [Font::rasterize] or [Font::rasterize_indexed]
   pub fn rasterize(&self, c: char, px: f32) -> (Metrics, Vec<u8>) {
@@ -127,6 +219,20 @@ impl Fonts {
       .unwrap_or_default()
   }
 
+  /// Measures text with a given font size
+  ///
+  /// **Example**
+  /// ```rs
+  /// let dimensions = fonts.measure_text("Some Text", 22);
+  ///
+  /// println!("width: {}, height: {}, offset_y: {}",
+  ///   dimensions.width,
+  ///   dimensions.height,
+  ///   dimensions.offset_y
+  /// )
+  /// ```
+  ///
+  /// **See** [TextDimensions]
   pub fn measure_text(&self, text: &str, size: u16) -> TextDimensions {
     let mut width = 0f32;
     let mut min_y = f32::MAX;
@@ -155,10 +261,17 @@ impl Fonts {
     }
   }
 
-  /// Draws text tp to the screen,
-  /// draws from TopLeft
+  /// Draws text with a given font size, draws from TopLeft
+  ///
+  /// **Examples**
+  /// ```rs
+  /// fonts.draw_text("Some Text", 20.0, 20.0, 22, Color::from_rgba(255, 255, 255, 255));
+  /// ```
+  ///
+  /// **See** [Self::draw_text_ex]
   pub fn draw_text(&self, text: &str, x: f32, y: f32, size: u16, color: Color) {
-    self.draw_text_ex(text, &TextParams {
+    self.draw_text_ex(&TextParams {
+      text,
       x,
       y,
       size,
@@ -167,10 +280,36 @@ impl Fonts {
     })
   }
 
-  pub fn draw_text_ex(&self, text: &str, params: &TextParams) {
+  /// Draws text with given [TextParams]
+  ///
+  /// **Example**
+  /// ```rs
+  /// fonts.draw_text_ex(&TextParams {
+  ///   text: "Some Text",
+  ///   x: 20.0,
+  ///   y: 20.0,
+  ///   // Default Size
+  ///   size: 22,
+  ///   // Default Color
+  ///   color: Color::from_rgba(255, 255, 255, 255),
+  ///   // Default Draw method
+  ///   draw: DrawFrom::TopLeft
+  /// });
+  ///
+  /// // Does the same as above
+  /// fonts.draw_text_ex(&TextParams {
+  ///   text: "Some Text",
+  ///   x: 20.0,
+  ///   y: 20.0,
+  ///   ..Default::default()
+  /// });
+  /// ```
+  ///
+  /// **See** [Self::draw_text]
+  pub fn draw_text_ex(&self, params: &TextParams) {
     let mut total_width = 0f32;
 
-    for c in text.chars() {
+    for c in params.text.chars() {
       self.cache_glyph(c, params.size);
       let mut atlas = self.atlas.borrow_mut();
       let info = &self.chars.borrow()[&(c, params.size)];

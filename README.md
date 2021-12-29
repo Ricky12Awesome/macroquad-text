@@ -1,7 +1,7 @@
-# MacroQuad Font Renderer
+# Macroquad Font Renderer
 
 A Simple way to draw text in macroquad with support of using glyphs
-from multiple fonts in a single draw_text, also known as fallback fonts
+from multiple fonts in a single draw_text call, also known as fallback fonts
 
 I made this because the one provided by macroquad doesn't support this
 

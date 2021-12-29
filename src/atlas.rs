@@ -2,6 +2,8 @@
 //! with very minor changes
 //! https://github.com/not-fl3/macroquad/blob/master/src/text/atlas.rs
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 
 use macroquad::prelude::{Color, FilterMode, Image, Rect, Texture2D};

@@ -2,9 +2,11 @@ use macroquad::prelude::*;
 
 use macroquad_font_renderer::Fonts;
 
+// Include Fonts
 const NOTO_SANS: &[u8] = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");
 const NOTO_SANS_JP: &[u8] = include_bytes!("../assets/fonts/NotoSansJP-Regular.otf");
 
+// Window config for macroquad
 fn window_conf() -> Conf {
   Conf {
     window_title: "Rendering Text A lot Example".to_owned(),
@@ -18,17 +20,14 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+  // Start by creating a fonts instance to handle all your fonts
   let mut fonts = Fonts::default();
 
+  // Load fonts, the order you load fonts is the order it uses for lookups
   fonts.load_font_from_bytes(NOTO_SANS).unwrap();
   fonts.load_font_from_bytes(NOTO_SANS_JP).unwrap();
 
-  for font in fonts.fonts() {
-    println!("{} {}", font.file_hash(), font.glyph_count());
-  }
-
   // This might take a while to cache all of these chars
-
   let chars = (0..24000u32)
     .filter_map(char::from_u32)
     .filter(|c| fonts.contains(*c))
@@ -38,6 +37,7 @@ async fn main() {
     .collect::<Vec<_>>();
 
   loop {
+    // Draws a bunch of characters
     for (i, line) in chars.iter().enumerate() {
       fonts.draw_text(line, 0.0, 24.0 * i as f32, 18, Color::from([1.0; 4]));
     }
@@ -45,8 +45,3 @@ async fn main() {
     next_frame().await;
   }
 }
-
-
-
-
-
