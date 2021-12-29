@@ -1,6 +1,6 @@
 use macroquad::prelude::*;
 
-use macroquad_font_renderer::{DrawFrom, Fonts, TextParams};
+use macroquad_text::{DrawFrom, Fonts, TextParams};
 
 // Include Fonts
 const NOTO_SANS: &[u8] = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");

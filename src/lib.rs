@@ -4,7 +4,7 @@
 //!
 //! **Example**
 //!
-//! From [examples/render_text.rs](https://github.com/Ricky12Awesome/macroquad_font_renderer/blob/main/examples/render_text.rs)
+//! From [examples/render_text.rs](https://github.com/Ricky12Awesome/macroquad-text/blob/main/examples/render_text.rs)
 //!
 //! ```rs
 //! // Include Fonts
@@ -34,7 +34,7 @@
 //! }
 //! ```
 //!
-//! ![img.png](https://raw.githubusercontent.com/Ricky12Awesome/macroquad_font_renderer/main/examples/render_text_window.png)
+//! ![img.png](https://raw.githubusercontent.com/Ricky12Awesome/macroquad-text/main/examples/render_text_window.png)
 //!
 
 use std::cell::RefCell;
