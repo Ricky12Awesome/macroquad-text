@@ -24,8 +24,8 @@ async fn main() {
   let mut fonts = Fonts::default();
 
   // Load fonts, the order you load fonts is the order it uses for lookups
-  fonts.load_font_from_bytes(NOTO_SANS).unwrap();
-  fonts.load_font_from_bytes(NOTO_SANS_JP).unwrap();
+  fonts.load_font_from_bytes("Noto Sans", NOTO_SANS).unwrap();
+  fonts.load_font_from_bytes("Noto Sans JP", NOTO_SANS_JP).unwrap();
 
   loop {
     // Draw text

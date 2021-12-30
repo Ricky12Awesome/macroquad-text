@@ -39,8 +39,9 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::ops::Deref;
 
-use fontdue::{Font, FontResult, FontSettings, Metrics};
+use fontdue::{FontResult, FontSettings, Metrics};
 use macroquad::prelude::{Color, draw_texture_ex, DrawTextureParams, FilterMode, Image, TextDimensions, vec2};
 
 use crate::atlas::Atlas;
@@ -48,6 +49,7 @@ use crate::atlas::Atlas;
 pub(crate) mod atlas;
 
 pub type ScalingMode = FilterMode;
+pub type FontdueFont = fontdue::Font;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DrawFrom {
@@ -92,13 +94,27 @@ impl<'a> Default for TextParams<'a> {
   }
 }
 
-pub struct Fonts {
-  fonts: Vec<Font>,
+pub struct Font<'a> {
+  pub name: &'a str,
+  font: FontdueFont,
+}
+
+impl<'a> Deref for Font<'a> {
+  type Target = FontdueFont;
+
+  fn deref(&self) -> &Self::Target {
+    &self.font
+  }
+}
+
+pub struct Fonts<'a> {
+  fonts: Vec<Font<'a>>,
+  index: HashMap<&'a str, usize>,
   atlas: RefCell<Atlas>,
   chars: RefCell<HashMap<(char, u16), CharacterInfo>>,
 }
 
-impl Default for Fonts {
+impl<'a> Default for Fonts<'a> {
   /// Creates a new [Fonts] instance to handle all your font
   ///
   /// Same as calling [Fonts::new(ScalingMode::Linear)]
@@ -107,7 +123,7 @@ impl Default for Fonts {
   }
 }
 
-impl Fonts {
+impl<'a> Fonts<'a> {
   /// Creates a new [Fonts] instance to handle all your fonts with a given [ScalingMode]
   ///
   /// You can also call [Fonts::default] which defaults to [ScalingMode::Linear]
@@ -125,6 +141,7 @@ impl Fonts {
   pub fn new(mode: ScalingMode) -> Self {
     Self {
       fonts: Vec::default(),
+      index: HashMap::default(),
       atlas: RefCell::new(Atlas::new(mode)),
       chars: RefCell::default(),
     }
@@ -168,7 +185,7 @@ impl Fonts {
     cache.insert((c, size), info);
   }
 
-  /// Loads font from bytes with a given scale
+  /// Loads font from bytes with a given name and scale
   ///
   ///
   /// What Scale does
@@ -180,18 +197,63 @@ impl Fonts {
   /// rendered smaller than this scale will look the same but perform slightly worse, while
   /// glyphs rendered larger than this will looks worse but perform slightly better. The units of
   /// the scale are pixels per Em unit.
-  pub fn load_font_from_bytes_with_scale(&mut self, bytes: &[u8], scale: f32) -> FontResult<()> {
+  pub fn load_font_from_bytes_with_scale(&mut self, name: &'a str, bytes: &[u8], scale: f32) -> FontResult<()> {
     let settings = FontSettings { collection_index: 0, scale };
-    let font = Font::from_bytes(bytes, settings)?;
+    let font = FontdueFont::from_bytes(bytes, settings)?;
 
-    self.fonts.push(font);
+    self.index.insert(name, self.fonts.len());
+    self.fonts.push(Font { name, font });
 
     Ok(())
   }
 
-  /// Loads font from bytes with a scale of 100.0
-  pub fn load_font_from_bytes(&mut self, bytes: &[u8]) -> FontResult<()> {
-    self.load_font_from_bytes_with_scale(bytes, 100.0)
+  /// Loads font from bytes with a given name and a default scale of 100.0
+  ///
+  /// **See** [Self::load_font_from_bytes_with_scale]
+  pub fn load_font_from_bytes(&mut self, name: &'a str, bytes: &[u8]) -> FontResult<()> {
+    self.load_font_from_bytes_with_scale(name, bytes, 100.0)
+  }
+
+  /// Unloads a currently loaded font by its index
+  ///
+  /// This will also re-index all the currently loaded fonts
+  pub fn unload_font_by_index(&mut self, index: usize) {
+    if self.fonts.len() <= index {
+      return;
+    }
+
+    self.fonts.remove(index);
+    self.index.clear();
+
+    for (index, font) in self.fonts.iter().enumerate() {
+      self.index.insert(font.name, index);
+    }
+  }
+
+  /// Unloads a currently loaded font by it name
+  ///
+  /// This will also re-index all the currently loaded fonts
+  pub fn unload_font_by_name(&mut self, name: &str) {
+    self.unload_font_by_index(
+      self
+        .get_font_index_by_name(name)
+        .unwrap_or(self.fonts.len())
+    );
+  }
+
+  /// Gets a currently loaded font by its index
+  pub fn get_font_by_index(&self, index: usize) -> Option<&Font> {
+    self.fonts.get(index)
+  }
+
+  /// Gets a currently loaded font index by its name
+  pub fn get_font_index_by_name(&self, name: &str) -> Option<usize> {
+    self.index.get(name).copied()
+  }
+
+  /// Gets a currently loaded font by its name
+  pub fn get_font_by_name(&self, name: &str) -> Option<&Font> {
+    self.get_font_by_index(self.get_font_index_by_name(name)?)
   }
 
   /// Checks if any fonts supports this character
