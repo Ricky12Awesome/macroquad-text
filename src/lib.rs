@@ -20,8 +20,8 @@
 //!   let mut fonts = Fonts::default();
 //!
 //!   // Load fonts, the order you load fonts is the order it uses for lookups
-//!   fonts.load_font_from_bytes(NOTO_SANS).unwrap();
-//!   fonts.load_font_from_bytes(NOTO_SANS_JP).unwrap();
+//!   fonts.load_font_from_bytes("Noto Sans", NOTO_SANS).unwrap();
+//!   fonts.load_font_from_bytes("Noto Sans JP", NOTO_SANS_JP).unwrap();
 //!
 //!   loop {
 //!     // Draw text
@@ -94,6 +94,7 @@ impl<'a> Default for TextParams<'a> {
   }
 }
 
+#[derive(Debug)]
 pub struct Font<'a> {
   pub name: &'a str,
   font: FontdueFont,
@@ -153,15 +154,14 @@ impl<'a> Fonts<'a> {
     &self.fonts
   }
 
-  /// Caches a glyph for a given character with a given font size
-  ///
-  /// You don't really need to call this function since caching happens automatically
-  pub fn cache_glyph(&self, c: char, size: u16) {
-    if self.chars.borrow().contains_key(&(c, size)) {
-      return;
+  /// Recaches all cached glyphs, this is expensive to call
+  pub fn recache_glyphs(&self) {
+    for ((c, size), info) in self.chars.borrow_mut().iter_mut() {
+      *info = self._cache_glyph(*c, *size);
     }
+  }
 
-    let mut cache = self.chars.borrow_mut();
+  fn _cache_glyph(&self, c: char, size: u16) -> CharacterInfo {
     let mut atlas = self.atlas.borrow_mut();
 
     let (matrix, bitmap) = self.rasterize(c, size as f32);
@@ -175,14 +175,23 @@ impl<'a> Fonts<'a> {
 
     atlas.cache_sprite(id, Image { width, height, bytes });
 
-    let info = CharacterInfo {
+    CharacterInfo {
       id,
       offset_x: matrix.xmin as f32,
       offset_y: matrix.ymin as f32,
       advance: matrix.advance_width,
-    };
+    }
+  }
 
-    cache.insert((c, size), info);
+  /// Caches a glyph for a given character with a given font size
+  ///
+  /// You don't really need to call this function since caching happens automatically
+  pub fn cache_glyph(&self, c: char, size: u16) {
+    if !self.chars.borrow().contains_key(&(c, size)) {
+      let info = self._cache_glyph(c, size);
+
+      self.chars.borrow_mut().insert((c, size), info);
+    }
   }
 
   /// Loads font from bytes with a given name and scale
@@ -203,6 +212,8 @@ impl<'a> Fonts<'a> {
 
     self.index.insert(name, self.fonts.len());
     self.fonts.push(Font { name, font });
+
+    self.recache_glyphs();
 
     Ok(())
   }
@@ -228,16 +239,17 @@ impl<'a> Fonts<'a> {
     for (index, font) in self.fonts.iter().enumerate() {
       self.index.insert(font.name, index);
     }
+
+    self.recache_glyphs();
   }
 
   /// Unloads a currently loaded font by it name
   ///
   /// This will also re-index all the currently loaded fonts
   pub fn unload_font_by_name(&mut self, name: &str) {
-    self.unload_font_by_index(
-      self
-        .get_font_index_by_name(name)
-        .unwrap_or(self.fonts.len())
+    self.unload_font_by_index(self
+      .get_index_by_name(name)
+      .unwrap_or(self.fonts.len())
     );
   }
 
@@ -247,13 +259,13 @@ impl<'a> Fonts<'a> {
   }
 
   /// Gets a currently loaded font index by its name
-  pub fn get_font_index_by_name(&self, name: &str) -> Option<usize> {
+  pub fn get_index_by_name(&self, name: &str) -> Option<usize> {
     self.index.get(name).copied()
   }
 
   /// Gets a currently loaded font by its name
   pub fn get_font_by_name(&self, name: &str) -> Option<&Font> {
-    self.get_font_by_index(self.get_font_index_by_name(name)?)
+    self.get_font_by_index(self.get_index_by_name(name)?)
   }
 
   /// Checks if any fonts supports this character
@@ -331,7 +343,7 @@ impl<'a> Fonts<'a> {
   /// ```
   ///
   /// **See** [Self::draw_text_ex]
-  pub fn draw_text(&self, text: &str, x: f32, y: f32, size: u16, color: Color) {
+  pub fn draw_text(&self, text: &str, x: f32, y: f32, size: u16, color: Color) -> TextDimensions {
     self.draw_text_ex(&TextParams {
       text,
       x,
@@ -368,7 +380,7 @@ impl<'a> Fonts<'a> {
   /// ```
   ///
   /// **See** [Self::draw_text]
-  pub fn draw_text_ex(&self, params: &TextParams) {
+  pub fn draw_text_ex(&self, params: &TextParams) -> TextDimensions {
     let mut total_width = 0f32;
 
     for c in params.text.chars() {
@@ -396,5 +408,7 @@ impl<'a> Fonts<'a> {
 
       total_width += info.advance;
     }
+
+    self.measure_text(params.text, params.size)
   }
 }
