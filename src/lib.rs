@@ -40,13 +40,16 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
+use std::path::Path;
 
 use fontdue::{FontResult, FontSettings, Metrics};
 use macroquad::prelude::{Color, draw_texture_ex, DrawTextureParams, FilterMode, Image, TextDimensions, vec2};
 
 use crate::atlas::Atlas;
+use crate::misc::{IoError, IoErrorKind, IoResult, read_file};
 
 pub(crate) mod atlas;
+pub(crate) mod misc;
 
 pub type ScalingMode = FilterMode;
 pub type FontdueFont = fontdue::Font;
@@ -108,6 +111,7 @@ impl<'a> Deref for Font<'a> {
   }
 }
 
+#[derive(Debug)]
 pub struct Fonts<'a> {
   fonts: Vec<Font<'a>>,
   index: HashMap<&'a str, usize>,
@@ -223,6 +227,23 @@ impl<'a> Fonts<'a> {
   /// **See** [Self::load_font_from_bytes_with_scale]
   pub fn load_font_from_bytes(&mut self, name: &'a str, bytes: &[u8]) -> FontResult<()> {
     self.load_font_from_bytes_with_scale(name, bytes, 100.0)
+  }
+
+  /// Loads font from a file with a given name and path and a default scale of 100.0
+  ///
+  /// **See** [Self::load_font_from_bytes_with_scale]
+  pub fn load_font_from_file(&mut self, name: &'a str, path: impl AsRef<Path>) -> IoResult<()> {
+    self.load_font_from_file_with_scale(name, path, 100.0)
+  }
+
+  /// Loads font from a file with a given name, path and scale
+  ///
+  /// **See** [Self::load_font_from_bytes_with_scale]
+  pub fn load_font_from_file_with_scale(&mut self, name: &'a str, path: impl AsRef<Path>, scale: f32) -> IoResult<()> {
+    let bytes = read_file(path)?;
+
+    self.load_font_from_bytes_with_scale(name, &bytes, scale)
+      .map_err(|err| IoError::new(IoErrorKind::InvalidData, err))
   }
 
   /// Unloads a currently loaded font by its index
