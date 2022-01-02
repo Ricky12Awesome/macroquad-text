@@ -42,7 +42,7 @@ use std::collections::HashMap;
 use std::ops::Deref;
 use std::path::Path;
 
-use fontdue::{FontResult, FontSettings, Metrics};
+use fontdue::{FontResult, FontSettings};
 use macroquad::prelude::{Color, draw_texture_ex, DrawTextureParams, FilterMode, Image, TextDimensions, vec2};
 
 use crate::atlas::Atlas;
@@ -101,6 +101,8 @@ impl<'a> Default for TextParams<'a> {
 pub struct Font<'a> {
   pub name: &'a str,
   font: FontdueFont,
+  atlas: RefCell<Atlas>,
+  chars: RefCell<HashMap<(char, u16), CharacterInfo>>,
 }
 
 impl<'a> Deref for Font<'a> {
@@ -111,12 +113,67 @@ impl<'a> Deref for Font<'a> {
   }
 }
 
+impl <'a> Font<'a> {
+  fn new(name: &'a str, font: FontdueFont, mode: ScalingMode) -> Self {
+    Self {
+      name,
+      font,
+      atlas: RefCell::new(Atlas::new(mode)),
+      chars: RefCell::default(),
+    }
+  }
+
+  /// Checks if this font contains a given character
+  pub fn contains(&self, c: char) -> bool {
+    self.lookup_glyph_index(c) != 0
+  }
+
+  fn _cache_glyph(&self, c: char, size: u16) -> CharacterInfo {
+    let (matrix, bitmap) = self.rasterize(c, size as f32);
+    let (width, height) = (matrix.width as u16, matrix.height as u16);
+
+    let id = self.atlas.borrow_mut().new_unique_id();
+    let bytes = bitmap
+      .iter()
+      .flat_map(|coverage| vec![255, 255, 255, *coverage])
+      .collect::<Vec<_>>();
+
+    self.atlas.borrow_mut().cache_sprite(id, Image { width, height, bytes });
+
+    CharacterInfo {
+      id,
+      offset_x: matrix.xmin as f32,
+      offset_y: matrix.ymin as f32,
+      advance: matrix.advance_width,
+    }
+  }
+
+  /// Caches a glyph for a given character with a given font size
+  ///
+  /// You don't really need to call this function since caching happens automatically
+  pub fn cache_glyph(&self, c: char, size: u16) {
+    if !self.chars.borrow().contains_key(&(c, size)) {
+      let info = self._cache_glyph(c, size);
+
+      self.chars.borrow_mut().insert((c, size), info);
+    }
+  }
+
+  /// Recaches all cached glyphs, this is expensive to call
+  ///
+  /// normally you wouldn't need to call this
+  pub fn recache_glyphs(&self) {
+    for ((c, size), info) in self.chars.borrow_mut().iter_mut() {
+      *info = self._cache_glyph(*c, *size);
+    }
+  }
+}
+
 #[derive(Debug)]
 pub struct Fonts<'a> {
   fonts: Vec<Font<'a>>,
-  index: HashMap<&'a str, usize>,
-  atlas: RefCell<Atlas>,
-  chars: RefCell<HashMap<(char, u16), CharacterInfo>>,
+  index_by_name: HashMap<&'a str, usize>,
+  default_sm: ScalingMode,
 }
 
 impl<'a> Default for Fonts<'a> {
@@ -143,12 +200,11 @@ impl<'a> Fonts<'a> {
   /// ```rs
   /// let mut fonts = Fonts::new(ScalingMode::Linear);
   /// ```
-  pub fn new(mode: ScalingMode) -> Self {
+  pub fn new(default_sm: ScalingMode) -> Self {
     Self {
       fonts: Vec::default(),
-      index: HashMap::default(),
-      atlas: RefCell::new(Atlas::new(mode)),
-      chars: RefCell::default(),
+      index_by_name: HashMap::default(),
+      default_sm,
     }
   }
 
@@ -158,43 +214,12 @@ impl<'a> Fonts<'a> {
     &self.fonts
   }
 
-  /// Recaches all cached glyphs, this is expensive to call
-  pub fn recache_glyphs(&self) {
-    for ((c, size), info) in self.chars.borrow_mut().iter_mut() {
-      *info = self._cache_glyph(*c, *size);
-    }
-  }
-
-  fn _cache_glyph(&self, c: char, size: u16) -> CharacterInfo {
-    let mut atlas = self.atlas.borrow_mut();
-
-    let (matrix, bitmap) = self.rasterize(c, size as f32);
-    let (width, height) = (matrix.width as u16, matrix.height as u16);
-
-    let id = atlas.new_unique_id();
-    let bytes = bitmap
-      .iter()
-      .flat_map(|coverage| vec![255, 255, 255, *coverage])
-      .collect::<Vec<_>>();
-
-    atlas.cache_sprite(id, Image { width, height, bytes });
-
-    CharacterInfo {
-      id,
-      offset_x: matrix.xmin as f32,
-      offset_y: matrix.ymin as f32,
-      advance: matrix.advance_width,
-    }
-  }
-
   /// Caches a glyph for a given character with a given font size
   ///
   /// You don't really need to call this function since caching happens automatically
   pub fn cache_glyph(&self, c: char, size: u16) {
-    if !self.chars.borrow().contains_key(&(c, size)) {
-      let info = self._cache_glyph(c, size);
-
-      self.chars.borrow_mut().insert((c, size), info);
+    for font in self.fonts.iter() {
+      font.cache_glyph(c, size);
     }
   }
 
@@ -214,10 +239,8 @@ impl<'a> Fonts<'a> {
     let settings = FontSettings { collection_index: 0, scale };
     let font = FontdueFont::from_bytes(bytes, settings)?;
 
-    self.index.insert(name, self.fonts.len());
-    self.fonts.push(Font { name, font });
-
-    self.recache_glyphs();
+    self.index_by_name.insert(name, self.fonts.len());
+    self.fonts.push(Font::new(name, font, self.default_sm));
 
     Ok(())
   }
@@ -255,13 +278,11 @@ impl<'a> Fonts<'a> {
     }
 
     self.fonts.remove(index);
-    self.index.clear();
+    self.index_by_name.clear();
 
     for (index, font) in self.fonts.iter().enumerate() {
-      self.index.insert(font.name, index);
+      self.index_by_name.insert(font.name, index);
     }
-
-    self.recache_glyphs();
   }
 
   /// Unloads a currently loaded font by it name
@@ -279,9 +300,14 @@ impl<'a> Fonts<'a> {
     self.fonts.get(index)
   }
 
+  /// Gets the first currently loaded font if it contains this character
+  pub fn get_index_by_char(&self, c: char) -> Option<usize> {
+    self.fonts.iter().position(|it| it.contains(c))
+  }
+
   /// Gets a currently loaded font index by its name
   pub fn get_index_by_name(&self, name: &str) -> Option<usize> {
-    self.index.get(name).copied()
+    self.index_by_name.get(name).copied()
   }
 
   /// Gets a currently loaded font by its name
@@ -289,29 +315,23 @@ impl<'a> Fonts<'a> {
     self.get_font_by_index(self.get_index_by_name(name)?)
   }
 
+  /// Gets the first currently loaded font if it contains this character
+  pub fn get_font_by_char(&self, c: char) -> Option<&Font> {
+    self.get_font_by_index(self.get_index_by_char(c)?)
+  }
+
+  /// Gets the first currently loaded font if it contains this character,
+  /// if no font that contains this character is found, it will return the first loaded font,
+  /// **if no fonts are loaded then it will panic**
+  pub fn get_font_by_char_or_panic(&self, c: char) -> &Font {
+    self.get_font_by_char(c)
+      .or_else(|| self.fonts.first())
+      .expect("There is no font currently loaded")
+  }
+
   /// Checks if any fonts supports this character
   pub fn contains(&self, c: char) -> bool {
-    self.lookup_glyph_index(c).1 != 0
-  }
-
-  /// Looks up glyph index in all fonts until it finds one
-  pub fn lookup_glyph_index(&self, c: char) -> (usize, u16) {
-    self.fonts.iter()
-      .map(|font| font.lookup_glyph_index(c))
-      .enumerate()
-      .find(|(_, glyph_idx)| *glyph_idx != 0)
-      .unwrap_or_default()
-  }
-
-  /// Rasterize a character using which ever font that contains that character first
-  ///
-  /// **See** [Font::rasterize] or [Font::rasterize_indexed]
-  pub fn rasterize(&self, c: char, px: f32) -> (Metrics, Vec<u8>) {
-    let (font_idx, glyph_idx) = self.lookup_glyph_index(c);
-
-    self.fonts.get(font_idx)
-      .map(|it| it.rasterize_indexed(glyph_idx, px))
-      .unwrap_or_default()
+    self.fonts.iter().any(|f| f.contains(c))
   }
 
   /// Measures text with a given font size
@@ -334,9 +354,12 @@ impl<'a> Fonts<'a> {
     let mut max_y = f32::MIN;
 
     for c in text.chars() {
-      self.cache_glyph(c, size);
-      let info = self.chars.borrow()[&(c, size)];
-      let glyph = self.atlas.borrow().get(info.id).unwrap().rect;
+      let font = self.get_font_by_char_or_panic(c);
+
+      font.cache_glyph(c, size);
+
+      let info = font.chars.borrow()[&(c, size)];
+      let glyph = font.atlas.borrow().get(info.id).unwrap().rect;
 
       width += info.advance;
 
@@ -405,9 +428,10 @@ impl<'a> Fonts<'a> {
     let mut total_width = 0f32;
 
     for c in params.text.chars() {
-      self.cache_glyph(c, params.size);
-      let mut atlas = self.atlas.borrow_mut();
-      let info = &self.chars.borrow()[&(c, params.size)];
+      let font = self.get_font_by_char_or_panic(c);
+      font.cache_glyph(c, params.size);
+      let mut atlas = font.atlas.borrow_mut();
+      let info = &font.chars.borrow()[&(c, params.size)];
       let glyph = atlas.get(info.id).unwrap().rect;
       let mut y = 0.0 - glyph.h - info.offset_y + params.y;
 
