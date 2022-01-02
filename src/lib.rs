@@ -54,9 +54,16 @@ pub(crate) mod misc;
 pub type ScalingMode = FilterMode;
 pub type FontdueFont = fontdue::Font;
 
+/// Where to draw from on the screen
+///
+/// **Default** [DrawFrom::TopLeft]
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd)]
 pub enum DrawFrom {
+  /// Starts drawing from the bottom left corner
   BottomLeft,
+  /// Starts drawing from the top left corner
+  ///
+  /// this is the default
   TopLeft,
 }
 
@@ -67,20 +74,27 @@ impl Default for DrawFrom {
 }
 
 #[derive(Default, Debug, Copy, Clone, PartialEq, PartialOrd)]
-pub struct CharacterInfo {
+pub(crate) struct CharacterInfo {
   pub id: u64,
   pub offset_x: f32,
   pub offset_y: f32,
   pub advance: f32,
 }
 
+/// Text parameters for [Fonts::draw_text_ex]
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct TextParams<'a> {
+  /// Text to draw to the screen
   pub text: &'a str,
+  /// x-coordinate of the text
   pub x: f32,
+  /// y-coordinate of the text
   pub y: f32,
+  /// The size of the text in pixels
   pub size: u16,
+  /// The color of the text
   pub color: Color,
+  /// Where to draw from
   pub draw: DrawFrom,
 }
 
@@ -97,6 +111,7 @@ impl<'a> Default for TextParams<'a> {
   }
 }
 
+/// Stores font data, also stores caches for much faster rendering times
 #[derive(Debug)]
 pub struct Font<'a> {
   pub name: &'a str,
@@ -114,6 +129,7 @@ impl<'a> Deref for Font<'a> {
 }
 
 impl <'a> Font<'a> {
+  /// Creates a new font with a given name, [fontdue::Font], and [ScalingMode]
   fn new(name: &'a str, font: FontdueFont, mode: ScalingMode) -> Self {
     Self {
       name,
