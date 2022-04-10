@@ -12,7 +12,7 @@ From [render_text](examples/render_text.rs) example
 ```rust
 use macroquad::prelude::*;
 
-use macroquad_font_renderer::Fonts;
+use macroquad_text::Fonts;
 
 const NOTO_SANS: &[u8] = include_bytes!("../assets/fonts/NotoSans-Regular.ttf");
 const NOTO_SANS_JP: &[u8] = include_bytes!("../assets/fonts/NotoSansJP-Regular.otf");
