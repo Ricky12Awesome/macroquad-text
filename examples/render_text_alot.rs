@@ -20,6 +20,10 @@ fn window_conf() -> Conf {
 
 #[macroquad::main(window_conf)]
 async fn main() {
+  _main().await;
+}
+
+async fn _main() {
   // Start by creating a fonts instance to handle all your fonts
   let mut fonts = Fonts::default();
 
@@ -28,7 +32,7 @@ async fn main() {
   fonts.load_font_from_bytes("Noto Sans JP", NOTO_SANS_JP).unwrap();
 
   // This might take a while to cache all of these chars
-  let chars = (0..24000u32)
+  let chars = (0..u16::MAX as u32)
     .filter_map(char::from_u32)
     .filter(|c| fonts.contains(*c))
     .collect::<Vec<char>>()
@@ -37,6 +41,8 @@ async fn main() {
     .collect::<Vec<_>>();
 
   loop {
+    clear_background(BLACK);
+
     // Draws a bunch of characters
     for (i, line) in chars.iter().enumerate() {
       fonts.draw_text(line, 0.0, 24.0 * i as f32, 18, Color::from([1.0; 4]));

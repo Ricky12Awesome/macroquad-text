@@ -14,7 +14,7 @@ exclude = ["assets"]
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-fontdue = "0.6"
+fontdue = "0.7"
 macroquad = { version = "0.3", default-features = false }
 
 [dev-dependencies]

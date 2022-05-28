@@ -37,6 +37,8 @@
 //! ![img.png](https://raw.githubusercontent.com/Ricky12Awesome/macroquad-text/main/examples/render_text_window.png)
 //!
 
+#![deny(unsafe_code)]
+
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::ops::Deref;
@@ -128,7 +130,7 @@ impl<'a> Deref for Font<'a> {
   }
 }
 
-impl <'a> Font<'a> {
+impl<'a> Font<'a> {
   /// Creates a new font with a given name, [fontdue::Font], and [ScalingMode]
   fn new(name: &'a str, font: FontdueFont, mode: ScalingMode) -> Self {
     Self {
@@ -446,6 +448,10 @@ impl<'a> Fonts<'a> {
     for c in params.text.chars() {
       let font = self.get_font_by_char_or_panic(c);
       font.cache_glyph(c, params.size);
+    }
+
+    for c in params.text.chars() {
+      let font = self.get_font_by_char_or_panic(c);
       let mut atlas = font.atlas.borrow_mut();
       let info = &font.chars.borrow()[&(c, params.size)];
       let glyph = atlas.get(info.id).unwrap().rect;
