@@ -15,7 +15,7 @@ exclude = ["assets"]
 
 [dependencies]
 fontdue = "0.7"
-macroquad = { version = "0.3", default-features = false }
+macroquad = { version = "0.4", default-features = false }
 
 [dev-dependencies]
-macroquad = { version = "0.3", default-features = false }
+macroquad = { version = "0.4", default-features = false }

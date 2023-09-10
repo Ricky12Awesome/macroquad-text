@@ -66,24 +66,21 @@ impl Atlas {
     self.image.height
   }
 
-  pub fn texture(&mut self) -> Texture2D {
+  pub fn texture(&mut self) -> &Texture2D {
     if self.dirty {
       self.dirty = false;
       if self.texture.width() != self.image.width as _
         || self.texture.height() != self.image.height as _
       {
-        self.texture = Texture2D::from_rgba8(
-          self.image.width,
-          self.image.height,
-          &self.image.bytes[..],
-        );
+        self.texture =
+          Texture2D::from_rgba8(self.image.width, self.image.height, &self.image.bytes[..]);
         self.texture.set_filter(self.filter);
       }
 
       self.texture.update(&self.image);
     }
 
-    self.texture
+    &self.texture
   }
 
   pub fn get_uv_rect(&self, key: u64) -> Option<Rect> {

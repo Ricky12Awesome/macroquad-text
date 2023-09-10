@@ -39,16 +39,17 @@
 
 #![deny(unsafe_code)]
 
-use std::cell::RefCell;
-use std::collections::HashMap;
-use std::ops::Deref;
-use std::path::Path;
+use std::{cell::RefCell, collections::HashMap, ops::Deref, path::Path};
 
 use fontdue::{FontResult, FontSettings};
-use macroquad::prelude::{Color, draw_texture_ex, DrawTextureParams, FilterMode, Image, TextDimensions, vec2};
+use macroquad::prelude::{
+  draw_texture_ex, vec2, Color, DrawTextureParams, FilterMode, Image, TextDimensions,
+};
 
-use crate::atlas::Atlas;
-use crate::misc::{IoError, IoErrorKind, IoResult, read_file};
+use crate::{
+  atlas::Atlas,
+  misc::{read_file, IoError, IoErrorKind, IoResult},
+};
 
 pub(crate) mod atlas;
 pub(crate) mod misc;
@@ -156,7 +157,14 @@ impl<'a> Font<'a> {
       .flat_map(|coverage| vec![255, 255, 255, *coverage])
       .collect::<Vec<_>>();
 
-    self.atlas.borrow_mut().cache_sprite(id, Image { width, height, bytes });
+    self.atlas.borrow_mut().cache_sprite(
+      id,
+      Image {
+        width,
+        height,
+        bytes,
+      },
+    );
 
     CharacterInfo {
       id,
@@ -253,8 +261,16 @@ impl<'a> Fonts<'a> {
   /// rendered smaller than this scale will look the same but perform slightly worse, while
   /// glyphs rendered larger than this will looks worse but perform slightly better. The units of
   /// the scale are pixels per Em unit.
-  pub fn load_font_from_bytes_with_scale(&mut self, name: &'a str, bytes: &[u8], scale: f32) -> FontResult<()> {
-    let settings = FontSettings { collection_index: 0, scale };
+  pub fn load_font_from_bytes_with_scale(
+    &mut self,
+    name: &'a str,
+    bytes: &[u8],
+    scale: f32,
+  ) -> FontResult<()> {
+    let settings = FontSettings {
+      collection_index: 0,
+      scale,
+    };
     let font = FontdueFont::from_bytes(bytes, settings)?;
 
     self.index_by_name.insert(name, self.fonts.len());
@@ -280,10 +296,16 @@ impl<'a> Fonts<'a> {
   /// Loads font from a file with a given name, path and scale
   ///
   /// **See** [Self::load_font_from_bytes_with_scale]
-  pub fn load_font_from_file_with_scale(&mut self, name: &'a str, path: impl AsRef<Path>, scale: f32) -> IoResult<()> {
+  pub fn load_font_from_file_with_scale(
+    &mut self,
+    name: &'a str,
+    path: impl AsRef<Path>,
+    scale: f32,
+  ) -> IoResult<()> {
     let bytes = read_file(path)?;
 
-    self.load_font_from_bytes_with_scale(name, &bytes, scale)
+    self
+      .load_font_from_bytes_with_scale(name, &bytes, scale)
       .map_err(|err| IoError::new(IoErrorKind::InvalidData, err))
   }
 
@@ -307,10 +329,7 @@ impl<'a> Fonts<'a> {
   ///
   /// This will also re-index all the currently loaded fonts
   pub fn unload_font_by_name(&mut self, name: &str) {
-    self.unload_font_by_index(self
-      .get_index_by_name(name)
-      .unwrap_or(self.fonts.len())
-    );
+    self.unload_font_by_index(self.get_index_by_name(name).unwrap_or(self.fonts.len()));
   }
 
   /// Gets a currently loaded font by its index
@@ -342,7 +361,8 @@ impl<'a> Fonts<'a> {
   /// if no font that contains this character is found, it will return the first loaded font,
   /// **if no fonts are loaded then it will panic**
   pub fn get_font_by_char_or_panic(&self, c: char) -> &Font {
-    self.get_font_by_char(c)
+    self
+      .get_font_by_char(c)
       .or_else(|| self.fonts.first())
       .expect("There is no font currently loaded")
   }

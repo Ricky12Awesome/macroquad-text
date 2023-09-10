@@ -1,9 +1,5 @@
-use std::fs::File;
-pub use std::io::Error as IoError;
-pub use std::io::ErrorKind as IoErrorKind;
-use std::io::Read;
-pub use std::io::Result as IoResult;
-use std::path::Path;
+pub use std::io::{Error as IoError, ErrorKind as IoErrorKind, Result as IoResult};
+use std::{fs::File, io::Read, path::Path};
 
 pub fn read_file(path: impl AsRef<Path>) -> IoResult<Vec<u8>> {
   let mut file = File::open(path)?;
