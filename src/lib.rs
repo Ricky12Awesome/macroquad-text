@@ -120,7 +120,30 @@ pub struct Font<'a> {
   pub name: &'a str,
   font: FontdueFont,
   atlas: RefCell<Atlas>,
-  chars: RefCell<HashMap<(char, u16), CharacterInfo>>,
+  chars: RefCell<HashMap<(char, HashF32), CharacterInfo>>,
+}
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+struct HashF32([u8; 4]);
+
+impl From<f32> for HashF32 {
+  fn from(value: f32) -> Self {
+    Self::new(value)
+  }
+}
+
+impl HashF32 {
+  pub fn new(f: f32) -> Self {
+    match () {
+      _ if f.is_nan() => Self(f32::NAN.to_ne_bytes()),
+      _ if f.is_infinite() => Self(f32::INFINITY.to_ne_bytes()),
+      _ => Self(f.to_ne_bytes()),
+    }
+  }
+
+  pub fn as_f32(self) -> f32 {
+    f32::from_ne_bytes(self.0)
+  }
 }
 
 impl<'a> Deref for Font<'a> {
@@ -147,8 +170,8 @@ impl<'a> Font<'a> {
     self.lookup_glyph_index(c) != 0
   }
 
-  fn _cache_glyph(&self, c: char, size: u16) -> CharacterInfo {
-    let (matrix, bitmap) = self.rasterize(c, size as f32);
+  fn _cache_glyph(&self, c: char, size: f32) -> CharacterInfo {
+    let (matrix, bitmap) = self.rasterize(c, size);
     let (width, height) = (matrix.width as u16, matrix.height as u16);
 
     let id = self.atlas.borrow_mut().new_unique_id();
@@ -177,11 +200,11 @@ impl<'a> Font<'a> {
   /// Caches a glyph for a given character with a given font size
   ///
   /// You don't really need to call this function since caching happens automatically
-  pub fn cache_glyph(&self, c: char, size: u16) {
-    if !self.chars.borrow().contains_key(&(c, size)) {
+  pub fn cache_glyph(&self, c: char, size: f32) {
+    if !self.chars.borrow().contains_key(&(c, size.into())) {
       let info = self._cache_glyph(c, size);
 
-      self.chars.borrow_mut().insert((c, size), info);
+      self.chars.borrow_mut().insert((c, size.into()), info);
     }
   }
 
@@ -190,7 +213,7 @@ impl<'a> Font<'a> {
   /// normally you wouldn't need to call this
   pub fn recache_glyphs(&self) {
     for ((c, size), info) in self.chars.borrow_mut().iter_mut() {
-      *info = self._cache_glyph(*c, *size);
+      *info = self._cache_glyph(*c, size.as_f32());
     }
   }
 }
@@ -243,7 +266,7 @@ impl<'a> Fonts<'a> {
   /// Caches a glyph for a given character with a given font size
   ///
   /// You don't really need to call this function since caching happens automatically
-  pub fn cache_glyph(&self, c: char, size: u16) {
+  pub fn cache_glyph(&self, c: char, size: f32) {
     for font in self.fonts.iter() {
       font.cache_glyph(c, size);
     }
@@ -394,9 +417,9 @@ impl<'a> Fonts<'a> {
     for c in text.chars() {
       let font = self.get_font_by_char_or_panic(c);
 
-      font.cache_glyph(c, size as u16);
+      font.cache_glyph(c, size);
 
-      let info = font.chars.borrow()[&(c, size as u16)];
+      let info = font.chars.borrow()[&(c, size.into())];
       let glyph = font.atlas.borrow().get(info.id).unwrap().rect;
 
       width += info.advance;
@@ -467,13 +490,13 @@ impl<'a> Fonts<'a> {
 
     for c in params.text.chars() {
       let font = self.get_font_by_char_or_panic(c);
-      font.cache_glyph(c, params.size as u16);
+      font.cache_glyph(c, params.size);
     }
 
     for c in params.text.chars() {
       let font = self.get_font_by_char_or_panic(c);
       let mut atlas = font.atlas.borrow_mut();
-      let info = &font.chars.borrow()[&(c, params.size as u16)];
+      let info = &font.chars.borrow()[&(c, params.size.into())];
       let glyph = atlas.get(info.id).unwrap().rect;
       let mut y = 0.0 - glyph.h - info.offset_y + params.y;
 
