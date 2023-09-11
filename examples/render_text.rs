@@ -29,9 +29,9 @@ async fn main() {
 
   loop {
     // Draw text
-    fonts.draw_text("Nice", 20.0, 0.0, 69, Color::from([1.0; 4]));
-    fonts.draw_text("良い", 20.0, 89.0, 69, Color::from([1.0; 4]));
-    fonts.draw_text("Nice 良い", 20.0, 178.0, 69, Color::from([1.0; 4]));
+    fonts.draw_text("Nice", 20.0, 0.0, 69.5, Color::from([1.0; 4]));
+    fonts.draw_text("良い", 20.0, 89.0, 69.5, Color::from([1.0; 4]));
+    fonts.draw_text("Nice 良い", 20.0, 178.0, 69., Color::from([1.0; 4]));
 
     next_frame().await;
   }

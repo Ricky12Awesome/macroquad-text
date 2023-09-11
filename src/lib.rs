@@ -94,7 +94,7 @@ pub struct TextParams<'a> {
   /// y-coordinate of the text
   pub y: f32,
   /// The size of the text in pixels
-  pub size: u16,
+  pub size: f32,
   /// The color of the text
   pub color: Color,
   /// Where to draw from
@@ -107,7 +107,7 @@ impl<'a> Default for TextParams<'a> {
       text: "",
       x: 0.0,
       y: 0.0,
-      size: 22,
+      size: 22.,
       color: Color::from_rgba(255, 255, 255, 255),
       draw: DrawFrom::TopLeft,
     }
@@ -386,7 +386,7 @@ impl<'a> Fonts<'a> {
   /// ```
   ///
   /// **See** [TextDimensions]
-  pub fn measure_text(&self, text: &str, size: u16) -> TextDimensions {
+  pub fn measure_text(&self, text: &str, size: f32) -> TextDimensions {
     let mut width = 0f32;
     let mut min_y = f32::MAX;
     let mut max_y = f32::MIN;
@@ -394,9 +394,9 @@ impl<'a> Fonts<'a> {
     for c in text.chars() {
       let font = self.get_font_by_char_or_panic(c);
 
-      font.cache_glyph(c, size);
+      font.cache_glyph(c, size as u16);
 
-      let info = font.chars.borrow()[&(c, size)];
+      let info = font.chars.borrow()[&(c, size as u16)];
       let glyph = font.atlas.borrow().get(info.id).unwrap().rect;
 
       width += info.advance;
@@ -425,7 +425,7 @@ impl<'a> Fonts<'a> {
   /// ```
   ///
   /// **See** [Self::draw_text_ex]
-  pub fn draw_text(&self, text: &str, x: f32, y: f32, size: u16, color: Color) -> TextDimensions {
+  pub fn draw_text(&self, text: &str, x: f32, y: f32, size: f32, color: Color) -> TextDimensions {
     self.draw_text_ex(&TextParams {
       text,
       x,
@@ -467,18 +467,18 @@ impl<'a> Fonts<'a> {
 
     for c in params.text.chars() {
       let font = self.get_font_by_char_or_panic(c);
-      font.cache_glyph(c, params.size);
+      font.cache_glyph(c, params.size as u16);
     }
 
     for c in params.text.chars() {
       let font = self.get_font_by_char_or_panic(c);
       let mut atlas = font.atlas.borrow_mut();
-      let info = &font.chars.borrow()[&(c, params.size)];
+      let info = &font.chars.borrow()[&(c, params.size as u16)];
       let glyph = atlas.get(info.id).unwrap().rect;
       let mut y = 0.0 - glyph.h - info.offset_y + params.y;
 
       if let DrawFrom::TopLeft = params.draw {
-        y += params.size as f32;
+        y += params.size;
       }
 
       draw_texture_ex(
