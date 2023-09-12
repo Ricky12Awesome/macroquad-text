@@ -13,24 +13,31 @@ async fn main() {
 
   let mut str = String::new();
 
-  for c in 'A'..='z' {
+  for c in 'a'..='f' {
     str.push(c)
   }
 
   println!("{str}");
 
   loop {
-    let time = (get_time() * 1.).sin().abs() as f32;
-    let size = 1000.0 * time;
-    let scale = size / 1000.;
+    let time = (get_time() / 2.).sin().abs() as f32;
 
-    font.draw_scaled_text(
+    let text = font.draw_scaled_text(
       &str,
       10.,
-      00.,
-      1000.,
-      scale,
+      10.,
+      20.,
+      1. + time,
       Color::from_rgba(220, 220, 220, 255),
+    );
+
+    let text = font.draw_scaled_text(
+      "E",
+      10. + text.width,
+      10.,
+      20.,
+      1. + time,
+      Color::from_rgba(200, 50, 20, 255),
     );
 
     next_frame().await;

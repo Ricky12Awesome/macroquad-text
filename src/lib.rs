@@ -393,11 +393,46 @@ impl<'a> Fonts<'a> {
 
     for c in text.chars() {
       let font = self.get_font_by_char_or_panic(c);
-      let c = font.metrics(c, size);
-      let h = c.height as f32;
-      let offset_y = c.ymin as f32;
 
-      width += c.advance_width;
+      font.cache_glyph(c, size as u16);
+
+      let info = font.chars.borrow()[&(c, size as u16)];
+      let glyph = font.atlas.borrow().get(info.id).unwrap().rect;
+
+      width += info.advance;
+
+      if min_y > info.offset_y {
+        min_y = info.offset_y;
+      }
+
+      if max_y < glyph.h + info.offset_y {
+        max_y = glyph.h + info.offset_y;
+      }
+    }
+
+    TextDimensions {
+      width,
+      height: max_y - min_y,
+      offset_y: max_y,
+    }
+  }
+
+  pub fn measure_scaled_text(&self, text: &str, size: f32, scale: f32) -> TextDimensions {
+    let mut width = 0f32;
+    let mut min_y = f32::MAX;
+    let mut max_y = f32::MIN;
+
+    for c in text.chars() {
+      let font = self.get_font_by_char_or_panic(c);
+
+      font.cache_glyph(c, size as u16);
+
+      let info = font.chars.borrow()[&(c, size as u16)];
+      let glyph = font.atlas.borrow().get(info.id).unwrap().rect;
+      let h = glyph.h * scale;
+      let offset_y = info.offset_y * scale;
+
+      width += info.advance * scale;
 
       if min_y > offset_y {
         min_y = offset_y;
@@ -556,6 +591,6 @@ impl<'a> Fonts<'a> {
       total_width += advance;
     }
 
-    self.measure_text(params.text, params.size)
+    self.measure_scaled_text(params.text, params.size, scale)
   }
 }
