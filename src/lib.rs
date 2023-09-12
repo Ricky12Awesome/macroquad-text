@@ -53,7 +53,6 @@ use crate::{
 
 pub(crate) mod atlas;
 pub(crate) mod misc;
-pub mod text;
 
 pub type ScalingMode = FilterMode;
 pub type FontdueFont = fontdue::Font;
