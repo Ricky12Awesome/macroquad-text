@@ -53,6 +53,7 @@ use crate::{
 
 pub(crate) mod atlas;
 pub(crate) mod misc;
+pub mod text;
 
 pub type ScalingMode = FilterMode;
 pub type FontdueFont = fontdue::Font;
@@ -86,9 +87,7 @@ pub(crate) struct CharacterInfo {
 
 /// Text parameters for [Fonts::draw_text_ex]
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct TextParams<'a> {
-  /// Text to draw to the screen
-  pub text: &'a str,
+pub struct TextParams {
   /// x-coordinate of the text
   pub x: f32,
   /// y-coordinate of the text
@@ -106,10 +105,9 @@ pub struct TextParams<'a> {
   pub draw: DrawFrom,
 }
 
-impl<'a> Default for TextParams<'a> {
+impl Default for TextParams {
   fn default() -> Self {
     Self {
-      text: "",
       x: 0.0,
       y: 0.0,
       size: 22.,
@@ -479,8 +477,7 @@ impl<'a> Fonts<'a> {
   ///
   /// **See** [Self::draw_text_ex]
   pub fn draw_text(&self, text: &str, x: f32, y: f32, size: f32, color: Color) -> TextDimensions {
-    self.draw_text_ex(&TextParams {
-      text,
+    self.draw_text_ex(text, &TextParams {
       x,
       y,
       size,
@@ -494,8 +491,7 @@ impl<'a> Fonts<'a> {
   ///
   /// **Example**
   /// ```rs
-  /// fonts.draw_text_ex(&TextParams {
-  ///   text: "Some Text",
+  /// fonts.draw_text_ex("Some Text", &TextParams {
   ///   x: 20.,
   ///   y: 20.,
   ///   // Default Size
@@ -509,8 +505,7 @@ impl<'a> Fonts<'a> {
   /// });
   ///
   /// // Does the same as above
-  /// fonts.draw_text_ex(&TextParams {
-  ///   text: "Some Text",
+  /// fonts.draw_text_ex("Some Text", &TextParams {
   ///   x: 20.,
   ///   y: 20.,
   ///   ..Default::default()
@@ -518,46 +513,53 @@ impl<'a> Fonts<'a> {
   /// ```
   ///
   /// **See** [Self::draw_text]
-  pub fn draw_text_ex(&self, params: &TextParams) -> TextDimensions {
+  pub fn draw_text_ex(&self, text: &str, params: &TextParams) -> TextDimensions {
     let mut total_width = 0f32;
 
-    for c in params.text.chars() {
+    for c in text.chars() {
       let font = self.get_font_by_char_or_panic(c);
       font.cache_glyph(c, params.size as u16);
     }
 
-    for c in params.text.chars() {
-      let font = self.get_font_by_char_or_panic(c);
-      let mut atlas = font.atlas.borrow_mut();
-      let info = &font.chars.borrow()[&(c, params.size as u16)];
-      let glyph = atlas.get(info.id).unwrap().rect;
-      let w = glyph.w * params.scale;
-      let h = glyph.h * params.scale;
-      let offset_x = info.offset_x * params.scale;
-      let offset_y = info.offset_y * params.scale;
-      let advance = info.advance * params.scale;
-
-      let mut y = 0.0 - h - offset_y + params.y;
-
-      if let DrawFrom::TopLeft = params.draw {
-        y += params.size * params.scale;
-      }
-
-      draw_texture_ex(
-        atlas.texture(),
-        offset_x + total_width + params.x,
-        y,
-        params.color,
-        DrawTextureParams {
-          dest_size: Some(vec2(w, h)),
-          source: Some(glyph),
-          ..Default::default()
-        },
-      );
+    for c in text.chars() {
+      let advance = self.draw_char(c, total_width, params);
 
       total_width += advance;
     }
 
-    self.measure_scaled_text(params.text, params.size, params.scale)
+    self.measure_scaled_text(text, params.size, params.scale)
+  }
+
+  pub fn draw_char(&self, c: char, current_width: f32, params: &TextParams) -> f32 {
+    let font = self.get_font_by_char_or_panic(c);
+    font.cache_glyph(c, params.size as u16);
+    let mut atlas = font.atlas.borrow_mut();
+    let info = &font.chars.borrow()[&(c, params.size as u16)];
+    let glyph = atlas.get(info.id).unwrap().rect;
+    let w = glyph.w * params.scale;
+    let h = glyph.h * params.scale;
+    let offset_x = info.offset_x * params.scale;
+    let offset_y = info.offset_y * params.scale;
+    let advance = info.advance * params.scale;
+
+    let mut y = 0.0 - h - offset_y + params.y;
+
+    if let DrawFrom::TopLeft = params.draw {
+      y += params.size * params.scale;
+    }
+
+    draw_texture_ex(
+      atlas.texture(),
+      offset_x + current_width + params.x,
+      y,
+      params.color,
+      DrawTextureParams {
+        dest_size: Some(vec2(w, h)),
+        source: Some(glyph),
+        ..Default::default()
+      },
+    );
+
+    advance
   }
 }
