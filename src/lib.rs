@@ -95,6 +95,11 @@ pub struct TextParams<'a> {
   pub y: f32,
   /// The size of the text in pixels
   pub size: f32,
+  /// What the text should be scaled by,
+  /// this can make text look blurry
+  /// since it scales the texture not the
+  /// font itself for performance reasons
+  pub scale: f32,
   /// The color of the text
   pub color: Color,
   /// Where to draw from
@@ -108,6 +113,7 @@ impl<'a> Default for TextParams<'a> {
       x: 0.0,
       y: 0.0,
       size: 22.,
+      scale: 1.0,
       color: Color::from_rgba(255, 255, 255, 255),
       draw: DrawFrom::TopLeft,
     }
@@ -417,6 +423,20 @@ impl<'a> Fonts<'a> {
     }
   }
 
+  /// Measures text with a given font size and scale
+  ///
+  /// **Example**
+  /// ```rs
+  /// let dimensions = fonts.measure_scaled_text("Some Text", 22, 1.5);
+  ///
+  /// println!("width: {}, height: {}, offset_y: {}",
+  ///   dimensions.width,
+  ///   dimensions.height,
+  ///   dimensions.offset_y
+  /// )
+  /// ```
+  ///
+  /// **See** [TextDimensions]
   pub fn measure_scaled_text(&self, text: &str, size: f32, scale: f32) -> TextDimensions {
     let mut width = 0f32;
     let mut min_y = f32::MAX;
@@ -464,25 +484,7 @@ impl<'a> Fonts<'a> {
       x,
       y,
       size,
-      color,
-      draw: Default::default(),
-    })
-  }
-
-  pub fn draw_scaled_text(
-    &self,
-    text: &str,
-    x: f32,
-    y: f32,
-    size: f32,
-    scale: f32,
-    color: Color,
-  ) -> TextDimensions {
-    self.draw_scaled_text_ex(scale, &TextParams {
-      text,
-      x,
-      y,
-      size,
+      scale: 1.0,
       color,
       draw: Default::default(),
     })
@@ -494,10 +496,12 @@ impl<'a> Fonts<'a> {
   /// ```rs
   /// fonts.draw_text_ex(&TextParams {
   ///   text: "Some Text",
-  ///   x: 20.0,
-  ///   y: 20.0,
+  ///   x: 20.,
+  ///   y: 20.,
   ///   // Default Size
-  ///   size: 22,
+  ///   size: 22.,
+  ///   // Default Scale
+  //    scale: 1.
   ///   // Default Color
   ///   color: Color::from_rgba(255, 255, 255, 255),
   ///   // Default Draw method
@@ -507,8 +511,8 @@ impl<'a> Fonts<'a> {
   /// // Does the same as above
   /// fonts.draw_text_ex(&TextParams {
   ///   text: "Some Text",
-  ///   x: 20.0,
-  ///   y: 20.0,
+  ///   x: 20.,
+  ///   y: 20.,
   ///   ..Default::default()
   /// });
   /// ```
@@ -527,53 +531,16 @@ impl<'a> Fonts<'a> {
       let mut atlas = font.atlas.borrow_mut();
       let info = &font.chars.borrow()[&(c, params.size as u16)];
       let glyph = atlas.get(info.id).unwrap().rect;
-      let mut y = 0.0 - glyph.h - info.offset_y + params.y;
-
-      if let DrawFrom::TopLeft = params.draw {
-        y += params.size;
-      }
-
-      draw_texture_ex(
-        atlas.texture(),
-        info.offset_x + total_width + params.x,
-        y,
-        params.color,
-        DrawTextureParams {
-          dest_size: Some(vec2(glyph.w, glyph.h)),
-          source: Some(glyph),
-          ..Default::default()
-        },
-      );
-
-      total_width += info.advance;
-    }
-
-    self.measure_text(params.text, params.size)
-  }
-
-  pub fn draw_scaled_text_ex(&self, scale: f32, params: &TextParams) -> TextDimensions {
-    let mut total_width = 0f32;
-
-    for c in params.text.chars() {
-      let font = self.get_font_by_char_or_panic(c);
-      font.cache_glyph(c, params.size as u16);
-    }
-
-    for c in params.text.chars() {
-      let font = self.get_font_by_char_or_panic(c);
-      let mut atlas = font.atlas.borrow_mut();
-      let info = &font.chars.borrow()[&(c, params.size as u16)];
-      let glyph = atlas.get(info.id).unwrap().rect;
-      let w = glyph.w * scale;
-      let h = glyph.h * scale;
-      let offset_x = info.offset_x * scale;
-      let offset_y = info.offset_y * scale;
-      let advance = info.advance * scale;
+      let w = glyph.w * params.scale;
+      let h = glyph.h * params.scale;
+      let offset_x = info.offset_x * params.scale;
+      let offset_y = info.offset_y * params.scale;
+      let advance = info.advance * params.scale;
 
       let mut y = 0.0 - h - offset_y + params.y;
 
       if let DrawFrom::TopLeft = params.draw {
-        y += params.size * scale;
+        y += params.size * params.scale;
       }
 
       draw_texture_ex(
@@ -591,6 +558,6 @@ impl<'a> Fonts<'a> {
       total_width += advance;
     }
 
-    self.measure_scaled_text(params.text, params.size, scale)
+    self.measure_scaled_text(params.text, params.size, params.scale)
   }
 }
