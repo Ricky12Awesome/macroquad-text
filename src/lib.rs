@@ -393,20 +393,18 @@ impl<'a> Fonts<'a> {
 
     for c in text.chars() {
       let font = self.get_font_by_char_or_panic(c);
+      let c = font.metrics(c, size);
+      let h = c.height as f32;
+      let offset_y = c.ymin as f32;
 
-      font.cache_glyph(c, size as u16);
+      width += c.advance_width;
 
-      let info = font.chars.borrow()[&(c, size as u16)];
-      let glyph = font.atlas.borrow().get(info.id).unwrap().rect;
-
-      width += info.advance;
-
-      if min_y > info.offset_y {
-        min_y = info.offset_y;
+      if min_y > offset_y {
+        min_y = offset_y;
       }
 
-      if max_y < glyph.h + info.offset_y {
-        max_y = glyph.h + info.offset_y;
+      if max_y < h + offset_y {
+        max_y = h + offset_y;
       }
     }
 
@@ -427,6 +425,25 @@ impl<'a> Fonts<'a> {
   /// **See** [Self::draw_text_ex]
   pub fn draw_text(&self, text: &str, x: f32, y: f32, size: f32, color: Color) -> TextDimensions {
     self.draw_text_ex(&TextParams {
+      text,
+      x,
+      y,
+      size,
+      color,
+      draw: Default::default(),
+    })
+  }
+
+  pub fn draw_scaled_text(
+    &self,
+    text: &str,
+    x: f32,
+    y: f32,
+    size: f32,
+    source_font_size: u16,
+    color: Color,
+  ) -> TextDimensions {
+    self.draw_scaled_text_ex(source_font_size, &TextParams {
       text,
       x,
       y,
@@ -494,6 +511,48 @@ impl<'a> Fonts<'a> {
       );
 
       total_width += info.advance;
+    }
+
+    self.measure_text(params.text, params.size)
+  }
+
+  pub fn draw_scaled_text_ex(&self, source_font_size: u16, params: &TextParams) -> TextDimensions {
+    let mut total_width = 0f32;
+
+    for c in params.text.chars() {
+      let font = self.get_font_by_char_or_panic(c);
+      font.cache_glyph(c, source_font_size);
+    }
+
+    for c in params.text.chars() {
+      let font = self.get_font_by_char_or_panic(c);
+      let mut atlas = font.atlas.borrow_mut();
+      let info = &font.chars.borrow()[&(c, source_font_size)];
+      let glyph = atlas.get(info.id).unwrap().rect;
+      let c = font.metrics(c, params.size);
+      let w = c.width as f32;
+      let h = c.height as f32;
+      let offset_x = c.xmin as f32;
+      let offset_y = c.ymin as f32;
+      let mut y = 0.0 - h - offset_y + params.y;
+
+      if let DrawFrom::TopLeft = params.draw {
+        y += params.size;
+      }
+
+      draw_texture_ex(
+        atlas.texture(),
+        offset_x + total_width + params.x,
+        y,
+        params.color,
+        DrawTextureParams {
+          dest_size: Some(vec2(w, h)),
+          source: Some(glyph),
+          ..Default::default()
+        },
+      );
+
+      total_width += c.advance_width;
     }
 
     self.measure_text(params.text, params.size)
