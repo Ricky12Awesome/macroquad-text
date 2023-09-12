@@ -440,10 +440,10 @@ impl<'a> Fonts<'a> {
     x: f32,
     y: f32,
     size: f32,
-    source_font_size: u16,
+    scale: f32,
     color: Color,
   ) -> TextDimensions {
-    self.draw_scaled_text_ex(source_font_size, &TextParams {
+    self.draw_scaled_text_ex(scale, &TextParams {
       text,
       x,
       y,
@@ -516,28 +516,29 @@ impl<'a> Fonts<'a> {
     self.measure_text(params.text, params.size)
   }
 
-  pub fn draw_scaled_text_ex(&self, source_font_size: u16, params: &TextParams) -> TextDimensions {
+  pub fn draw_scaled_text_ex(&self, scale: f32, params: &TextParams) -> TextDimensions {
     let mut total_width = 0f32;
 
     for c in params.text.chars() {
       let font = self.get_font_by_char_or_panic(c);
-      font.cache_glyph(c, source_font_size);
+      font.cache_glyph(c, params.size as u16);
     }
 
     for c in params.text.chars() {
       let font = self.get_font_by_char_or_panic(c);
       let mut atlas = font.atlas.borrow_mut();
-      let info = &font.chars.borrow()[&(c, source_font_size)];
+      let info = &font.chars.borrow()[&(c, params.size as u16)];
       let glyph = atlas.get(info.id).unwrap().rect;
-      let c = font.metrics(c, params.size);
-      let w = c.width as f32;
-      let h = c.height as f32;
-      let offset_x = c.xmin as f32;
-      let offset_y = c.ymin as f32;
+      let w = glyph.w * scale;
+      let h = glyph.h * scale;
+      let offset_x = info.offset_x * scale;
+      let offset_y = info.offset_y * scale;
+      let advance = info.advance * scale;
+
       let mut y = 0.0 - h - offset_y + params.y;
 
       if let DrawFrom::TopLeft = params.draw {
-        y += params.size;
+        y += params.size * scale;
       }
 
       draw_texture_ex(
@@ -552,7 +553,7 @@ impl<'a> Fonts<'a> {
         },
       );
 
-      total_width += c.advance_width;
+      total_width += advance;
     }
 
     self.measure_text(params.text, params.size)

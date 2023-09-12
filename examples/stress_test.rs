@@ -20,15 +20,16 @@ async fn main() {
   println!("{str}");
 
   loop {
-    let time = (get_time() * 25.).sin().abs() as f32;
-    let size = 1000. * time;
+    let time = (get_time() * 1.).sin().abs() as f32;
+    let size = 1000.0 * time;
+    let scale = size / 1000.;
 
     font.draw_scaled_text(
       &str,
       10.,
-      10.,
-      size,
-      1000,
+      00.,
+      1000.,
+      scale,
       Color::from_rgba(220, 220, 220, 255),
     );
 
