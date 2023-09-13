@@ -489,9 +489,8 @@ impl<'a> Fonts<'a> {
         x,
         y,
         size,
-        scale: 1.0,
         color,
-        draw: Default::default(),
+        ..Default::default()
       },
     )
   }
