@@ -49,6 +49,7 @@ use macroquad::prelude::{
 use crate::{
   atlas::Atlas,
   misc::{read_file, IoError, IoErrorKind, IoResult},
+  text::ColoredStr,
 };
 
 pub(crate) mod atlas;
@@ -390,12 +391,12 @@ impl<'a> Fonts<'a> {
   /// ```
   ///
   /// **See** [TextDimensions]
-  pub fn measure_text(&self, text: &str, size: f32) -> TextDimensions {
+  pub fn measure_text(&self, text: impl Iterator<Item = char>, size: f32) -> TextDimensions {
     let mut width = 0f32;
     let mut min_y = f32::MAX;
     let mut max_y = f32::MIN;
 
-    for c in text.chars() {
+    for c in text {
       let font = self.get_font_by_char_or_panic(c);
 
       font.cache_glyph(c, size as u16);
@@ -435,12 +436,17 @@ impl<'a> Fonts<'a> {
   /// ```
   ///
   /// **See** [TextDimensions]
-  pub fn measure_scaled_text(&self, text: &str, size: f32, scale: f32) -> TextDimensions {
+  pub fn measure_scaled_text(
+    &self,
+    text: impl Iterator<Item = char>,
+    size: f32,
+    scale: f32,
+  ) -> TextDimensions {
     let mut width = 0f32;
     let mut min_y = f32::MAX;
     let mut max_y = f32::MIN;
 
-    for c in text.chars() {
+    for c in text {
       let font = self.get_font_by_char_or_panic(c);
 
       font.cache_glyph(c, size as u16);
@@ -477,14 +483,17 @@ impl<'a> Fonts<'a> {
   ///
   /// **See** [Self::draw_text_ex]
   pub fn draw_text(&self, text: &str, x: f32, y: f32, size: f32, color: Color) -> TextDimensions {
-    self.draw_text_ex(text, &TextParams {
-      x,
-      y,
-      size,
-      scale: 1.0,
-      color,
-      draw: Default::default(),
-    })
+    self.draw_text_ex(
+      text,
+      &TextParams {
+        x,
+        y,
+        size,
+        scale: 1.0,
+        color,
+        draw: Default::default(),
+      },
+    )
   }
 
   /// Draws text with given [TextParams]
@@ -522,17 +531,42 @@ impl<'a> Fonts<'a> {
     }
 
     for c in text.chars() {
-      let advance = self.draw_char(c, total_width, params);
+      let font = self.get_font_by_char_or_panic(c);
+      let advance = self._draw_char(c, total_width, params.color, font, params);
 
       total_width += advance;
     }
 
-    self.measure_scaled_text(text, params.size, params.scale)
+    self.measure_scaled_text(text.chars(), params.size, params.scale)
   }
 
-  pub fn draw_char(&self, c: char, current_width: f32, params: &TextParams) -> f32 {
-    let font = self.get_font_by_char_or_panic(c);
-    font.cache_glyph(c, params.size as u16);
+  pub fn draw_colored_text_ex(&self, text: &ColoredStr, params: &TextParams) -> TextDimensions {
+    let mut total_width = 0f32;
+
+    for (c, _) in text.iter() {
+      let font = self.get_font_by_char_or_panic(c);
+      font.cache_glyph(c, params.size as u16);
+    }
+
+    for (c, color) in text.iter() {
+      let color = color.unwrap_or(params.color);
+      let font = self.get_font_by_char_or_panic(c);
+      let advance = self._draw_char(c, total_width, color, font, params);
+
+      total_width += advance;
+    }
+
+    self.measure_scaled_text(text.iter().map(|(c, _)| c), params.size, params.scale)
+  }
+
+  fn _draw_char(
+    &self,
+    c: char,
+    current_width: f32,
+    color: Color,
+    font: &Font,
+    params: &TextParams,
+  ) -> f32 {
     let mut atlas = font.atlas.borrow_mut();
     let info = &font.chars.borrow()[&(c, params.size as u16)];
     let glyph = atlas.get(info.id).unwrap().rect;
@@ -552,7 +586,7 @@ impl<'a> Fonts<'a> {
       atlas.texture(),
       offset_x + current_width + params.x,
       y,
-      params.color,
+      color,
       DrawTextureParams {
         dest_size: Some(vec2(w, h)),
         source: Some(glyph),
@@ -561,5 +595,12 @@ impl<'a> Fonts<'a> {
     );
 
     advance
+  }
+
+  pub fn draw_char(&self, c: char, current_width: f32, params: &TextParams) -> f32 {
+    let font = self.get_font_by_char_or_panic(c);
+    font.cache_glyph(c, params.size as u16);
+
+    self._draw_char(c, current_width, params.color, font, params)
   }
 }
